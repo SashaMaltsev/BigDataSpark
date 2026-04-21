@@ -1,0 +1,59 @@
+version: "2.4"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: lab2_postgres
+    environment:
+      POSTGRES_DB: lab2
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./01_create_mock_data_table.sql:/docker-entrypoint-initdb.d/01_create_mock_data_table.sql:ro
+      - ./BigDataSpark-main/исходные данные:/data/mock_data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab -d lab2"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: lab2_clickhouse
+    environment:
+      CLICKHOUSE_DB: lab2
+      CLICKHOUSE_USER: lab
+      CLICKHOUSE_PASSWORD: lab
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user lab --password lab --database lab2 --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  spark:
+    image: apache/spark:3.5.3
+    user: root
+    environment:
+      HOME: /tmp
+    volumes:
+      - ./spark:/opt/spark-apps:ro
+      - spark_ivy:/tmp/.ivy2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  spark_ivy:
